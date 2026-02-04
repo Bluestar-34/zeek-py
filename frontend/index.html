@@ -214,6 +214,27 @@
 
         <div class="card">
           <div class="card-header">
+            <strong>最近 HTTP 流量</strong>
+            <span class="muted" id="http-flows-count"></span>
+          </div>
+          <div style="max-height: 260px; overflow: auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>时间</th>
+                  <th>源</th>
+                  <th>目的</th>
+                  <th>协议 / 服务</th>
+                  <th>字节</th>
+                </tr>
+              </thead>
+              <tbody id="http-flows-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
             <strong>最近威胁 / 告警</strong>
             <span class="muted" id="threats-count"></span>
           </div>
@@ -468,8 +489,9 @@
       async function refreshFlowsAndThreats() {
         try {
           const sinceTs = getSinceTs();
-          const [flows, threats] = await Promise.all([
+          const [flows, httpFlows, threats] = await Promise.all([
             fetchJSON(`/api/flows?limit=100&since_ts=${sinceTs}`),
+            fetchJSON(`/api/flows/http?limit=100&since_ts=${sinceTs}`),
             fetchJSON(`/api/threats?limit=100&since_ts=${sinceTs}`),
           ]);
 
@@ -477,11 +499,15 @@
           const flowsSorted = [...flows].sort(
             (a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime(),
           );
+          const httpFlowsSorted = [...httpFlows].sort(
+            (a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime(),
+          );
           const threatsSorted = [...threats].sort(
             (a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime(),
           );
 
           $("flows-count").textContent = `共 ${flowsSorted.length} 条`;
+          $("http-flows-count").textContent = `共 ${httpFlowsSorted.length} 条`;
           $("threats-count").textContent = `共 ${threatsSorted.length} 条`;
 
           const fb = $("flows-body");
@@ -496,6 +522,20 @@
               <td>${(f.orig_bytes || 0) + (f.resp_bytes || 0)}</td>
             `;
             fb.appendChild(tr);
+          }
+
+          const hfb = $("http-flows-body");
+          hfb.innerHTML = "";
+          for (const f of httpFlowsSorted) {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+              <td>${formatTs(f.ts)}</td>
+              <td>${f.orig_h}:${f.orig_p}</td>
+              <td>${f.resp_h}:${f.resp_p}</td>
+              <td>${(f.proto || "-")}/${f.service || "http"}</td>
+              <td>${(f.orig_bytes || 0) + (f.resp_bytes || 0)}</td>
+            `;
+            hfb.appendChild(tr);
           }
 
           const tb = $("threats-body");

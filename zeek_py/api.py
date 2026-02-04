@@ -13,6 +13,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from .config import settings
 from .models import (
     Flow,
+    # 新增 HTTP 流量模型目前仍沿用 Flow 结构，如后续需要可单独扩展
     ThreatEvent,
     ZeekStatus,
     FlowAggregateBucket,
@@ -91,6 +92,27 @@ def api_list_flows(
         datetime.fromtimestamp(since_ts, tz=timezone.utc) if since_ts is not None else None
     )
     return storage.list_flows(limit=limit, since=since_dt)
+
+
+@app.get("/api/flows/http", response_model=List[Flow])
+def api_list_http_flows(
+    limit: int = Query(100, ge=1, le=1000),
+    since_ts: Optional[float] = Query(None, description="从此 UNIX 时间戳（秒）之后的记录"),
+) -> List[Flow]:
+    """
+    HTTP 流量明细接口：基于 /api/flows 结果进行筛选，只返回 service 为 http 的流。
+
+    如后续需要更丰富的 HTTP 维度（method/host/uri 等），可以在 models/storage 中
+    扩展专门的 HttpFlow 结构，并从 Zeek http.log 解析注入。
+    """
+    since_dt = (
+        datetime.fromtimestamp(since_ts, tz=timezone.utc) if since_ts is not None else None
+    )
+    all_flows = storage.list_flows(limit=10_000, since=since_dt)
+    http_flows = [f for f in all_flows if (f.service or "").lower() == "http"]
+    # 按时间排序后截取最新 limit 条，避免返回过多
+    http_flows_sorted = sorted(http_flows, key=lambda f: f.ts)[-limit:]
+    return http_flows_sorted
 
 
 @app.get("/api/threats", response_model=List[ThreatEvent])
