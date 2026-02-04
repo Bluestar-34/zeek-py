@@ -1,0 +1,1007 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>Zeek-Py 控制台</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/modern-normalize/2.0.0/modern-normalize.min.css"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+      body {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #0f172a;
+        color: #e5e7eb;
+        padding: 1.5rem;
+      }
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+      h1 {
+        font-size: 1.75rem;
+        margin-bottom: 0.5rem;
+      }
+      .muted {
+        color: #9ca3af;
+        font-size: 0.9rem;
+      }
+      .card {
+        background: #020617;
+        border-radius: 0.75rem;
+        padding: 1rem 1.25rem;
+        margin-top: 1rem;
+        box-shadow: 0 10px 25px rgba(15, 23, 42, 0.7);
+        border: 1px solid #1f2937;
+      }
+      .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.75rem;
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.15rem 0.55rem;
+        border-radius: 999px;
+        font-size: 0.75rem;
+        font-weight: 500;
+      }
+      .badge-success {
+        background: rgba(22, 163, 74, 0.2);
+        color: #4ade80;
+      }
+      .badge-danger {
+        background: rgba(239, 68, 68, 0.2);
+        color: #fca5a5;
+      }
+      .btn {
+        border: none;
+        border-radius: 999px;
+        padding: 0.45rem 0.9rem;
+        font-size: 0.85rem;
+        cursor: pointer;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+      }
+      .btn-primary {
+        background: linear-gradient(to right, #2563eb, #7c3aed);
+        color: #f9fafb;
+      }
+      .btn-danger {
+        background: linear-gradient(to right, #ef4444, #f97316);
+        color: #f9fafb;
+      }
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.8rem;
+      }
+      th,
+      td {
+        padding: 0.35rem 0.4rem;
+        border-bottom: 1px solid #111827;
+      }
+      th {
+        text-align: left;
+        color: #9ca3af;
+        font-weight: 500;
+      }
+      tr:nth-child(even) td {
+        background: rgba(15, 23, 42, 0.75);
+      }
+      code {
+        font-size: 0.75rem;
+        background: rgba(15, 23, 42, 0.9);
+        padding: 0.1rem 0.25rem;
+        border-radius: 0.25rem;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 1.1fr 0.9fr;
+        gap: 1rem;
+      }
+      @media (max-width: 900px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      .pill {
+        border-radius: 999px;
+        padding: 0.05rem 0.45rem;
+        font-size: 0.7rem;
+        background: rgba(31, 41, 55, 0.8);
+      }
+      .pill-warning {
+        background: rgba(234, 179, 8, 0.15);
+        color: #facc15;
+      }
+      .pill-info {
+        background: rgba(56, 189, 248, 0.15);
+        color: #7dd3fc;
+      }
+      .pill-crit {
+        background: rgba(248, 113, 113, 0.2);
+        color: #fecaca;
+      }
+      .flex-row {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+      .chart-wrapper {
+        height: 220px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Zeek-Py 网络流量控制台</h1>
+      <p class="muted">
+        管理 Zeek 引擎运行状态，查看实时普通流量与威胁流量数据。后端 API 位于
+        <code>/api/*</code>。
+      </p>
+
+
+      <div class="flex-row" style="margin: 0.75rem 0 0.25rem">
+        <button class="btn btn-primary" data-page-tab="overview">实时总览</button>
+        <button class="btn" data-page-tab="logs">日志明细</button>
+        <button class="btn" data-page-tab="rules">规则配置</button>
+      </div>
+
+      <div id="page-overview">
+
+      <div class="card" id="status-card">
+        <div class="card-header">
+          <div>
+            <strong>Zeek 状态</strong>
+            <div class="muted" id="status-detail"></div>
+          </div>
+          <div class="flex-row">
+            <span id="status-badge" class="badge">未知</span>
+            <button id="btn-start" class="btn btn-primary">启动 Zeek</button>
+            <button id="btn-stop" class="btn btn-danger">停止 Zeek</button>
+          </div>
+        </div>
+        <div class="muted" id="status-extra"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <strong>当前规则概况</strong>
+          <span class="muted">展示已配置的规则与自定义脚本状态</span>
+        </div>
+        <div class="muted" id="rules-summary-text">
+          正在加载规则配置...
+        </div>
+        <ul
+          id="rules-summary-list"
+          style="list-style:none;padding-left:0;margin:0.5rem 0 0 0;font-size:0.8rem;"
+        ></ul>
+      </div>
+
+      <div class="grid">
+        <div class="card">
+          <div class="card-header">
+            <strong>最近普通流量（conn.log JSON）</strong>
+            <span class="muted" id="flows-count"></span>
+          </div>
+          <div style="max-height: 260px; overflow: auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>时间</th>
+                  <th>源</th>
+                  <th>目的</th>
+                  <th>协议</th>
+                  <th>字节</th>
+                </tr>
+              </thead>
+              <tbody id="flows-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <strong>最近威胁 / 告警</strong>
+            <span class="muted" id="threats-count"></span>
+          </div>
+          <div style="max-height: 260px; overflow: auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>时间</th>
+                  <th>类型</th>
+                  <th>源 → 目的</th>
+                  <th>级别</th>
+                </tr>
+              </thead>
+              <tbody id="threats-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <strong>按时间段统计（最近几分钟）</strong>
+          <span class="muted">普通流量与威胁事件数量</span>
+        </div>
+        <div class="chart-wrapper">
+          <canvas id="trafficChart"></canvas>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <strong>后端聚合接口预览</strong>
+          <span class="muted">/api/flows/aggregate 与 /api/threats/aggregate</span>
+        </div>
+        <div class="grid">
+          <div>
+            <div class="muted" style="margin-bottom: 0.25rem">普通流量聚合（最近 10 桶）</div>
+            <div style="max-height: 220px; overflow: auto">
+              <table>
+                <thead>
+                  <tr>
+                    <th>时间段</th>
+                    <th>流量数</th>
+                    <th>orig_bytes</th>
+                    <th>resp_bytes</th>
+                  </tr>
+                </thead>
+                <tbody id="agg-flows-body"></tbody>
+              </table>
+            </div>
+          </div>
+          <div>
+            <div class="muted" style="margin-bottom: 0.25rem">威胁聚合（最近 10 桶）</div>
+            <div style="max-height: 220px; overflow: auto">
+              <table>
+                <thead>
+                  <tr>
+                    <th>时间段</th>
+                    <th>告警数</th>
+                    <th>按 Level</th>
+                    <th>按 Note</th>
+                  </tr>
+                </thead>
+                <tbody id="agg-threats-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      </div>
+
+      <div id="page-logs" style="display: none">
+        <div class="card">
+          <div class="card-header">
+            <strong>按日志类型明细视图</strong>
+            <span class="muted">conn / notice / intel / weird</span>
+          </div>
+          <div class="flex-row" style="margin-bottom: 0.5rem">
+            <button class="btn btn-primary" data-logtab="conn">conn.log</button>
+            <button class="btn" data-logtab="notice">notice.log</button>
+            <button class="btn" data-logtab="intel">intel.log</button>
+            <button class="btn" data-logtab="weird">weird.log</button>
+            <span class="muted" id="logtab-count" style="margin-left: auto"></span>
+          </div>
+          <div style="max-height: 260px; overflow: auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>时间</th>
+                  <th>类型 / Note</th>
+                  <th>源 → 目的</th>
+                  <th>级别 / Source</th>
+                </tr>
+              </thead>
+              <tbody id="logtab-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div id="page-rules" style="display: none">
+        <div class="card">
+          <div class="card-header">
+            <strong>规则配置</strong>
+            <span class="muted">对已存在规则下拉添加/删除，自定义规则可编辑输入</span>
+          </div>
+
+          <div class="muted" style="margin-top: 0.25rem; margin-bottom: 0.5rem">
+            数据时间范围配置（默认均为 7 天）
+          </div>
+          <div class="flex-row" style="margin-bottom: 0.5rem">
+            <label for="time-range-select" class="muted">默认数据显示时间范围：</label>
+            <select
+              id="time-range-select"
+              style="background:#020617;color:#e5e7eb;border-radius:999px;border:1px solid #1f2937;padding:0.25rem 0.75rem;font-size:0.85rem;"
+            >
+              <option value="300">最近 5 分钟</option>
+              <option value="900">最近 15 分钟</option>
+              <option value="3600" selected>最近 1 小时</option>
+              <option value="21600">最近 6 小时</option>
+              <option value="86400">最近 24 小时</option>
+              <option value="604800">最近 7 天</option>
+            </select>
+            <span class="muted" id="time-range-label" style="font-size:0.8rem;">
+              当前时间范围：最近 1 小时
+            </span>
+          </div>
+
+          <div class="flex-row" style="margin-bottom: 0.75rem">
+            <div>
+              <label for="data-retention-days" class="muted">数据保存时间（天）：</label>
+              <input
+                id="data-retention-days"
+                type="number"
+                min="1"
+                value="7"
+                style="width:80px;margin-left:0.25rem;background:#020617;color:#e5e7eb;border-radius:0.5rem;border:1px solid #1f2937;padding:0.25rem 0.5rem;font-size:0.8rem;"
+              />
+            </div>
+            <div>
+              <label for="data-display-days" class="muted">数据显示时间（天）：</label>
+              <input
+                id="data-display-days"
+                type="number"
+                min="1"
+                value="7"
+                style="width:80px;margin-left:0.25rem;background:#020617;color:#e5e7eb;border-radius:0.5rem;border:1px solid #1f2937;padding:0.25rem 0.5rem;font-size:0.8rem;"
+              />
+            </div>
+          </div>
+
+          <div class="muted" style="margin-bottom: 0.5rem">已有规则</div>
+          <div class="flex-row" style="margin-bottom: 0.75rem">
+            <select
+              id="rule-select"
+              style="background:#020617;color:#e5e7eb;border-radius:0.5rem;border:1px solid #1f2937;padding:0.25rem 0.75rem;font-size:0.85rem;"
+            >
+              <option value="policy/protocols/conn/scan">端口扫描检测（官方）</option>
+              <option value="policy/frameworks/notice/weird-manager">Weird 转 Notice（官方）</option>
+              <option value="custom/portscan">自定义端口扫描规则（示例）</option>
+            </select>
+            <button class="btn btn-primary" id="btn-add-rule">添加</button>
+          </div>
+
+          <div class="muted" style="margin-bottom: 0.25rem">已启用规则</div>
+          <ul
+            id="enabled-rules"
+            style="list-style:none;padding-left:0;margin:0 0 0.75rem 0;font-size:0.8rem;"
+          ></ul>
+
+          <div class="muted" style="margin-bottom: 0.25rem">自定义规则（Zeek 脚本片段）</div>
+          <textarea
+            id="custom-rule-text"
+            style="width:100%;min-height:160px;background:#020617;color:#e5e7eb;border-radius:0.5rem;border:1px solid #1f2937;padding:0.5rem;font-family:monospace;font-size:0.8rem;"
+            placeholder="# 在这里编写你自己的 Zeek 规则，保存后重启 Zeek 生效"
+          ></textarea>
+
+          <div class="flex-row" style="margin-top: 0.75rem; justify-content: flex-end">
+            <button class="btn btn-primary" id="btn-save-rules">保存规则配置</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+
+      let chart;
+      let currentTimeRangeSeconds = 3600; // 默认最近 1 小时（会根据配置调整）
+      let dataRetentionDays = 7; // 数据保存时间（天），来自规则配置
+      let dataDisplayDays = 7; // 数据显示时间（天），来自规则配置
+      let timeRangeSelectEl = null;
+
+      function formatTs(iso) {
+        try {
+          const d = new Date(iso);
+          return d.toLocaleTimeString();
+        } catch (e) {
+          return iso;
+        }
+      }
+
+      function describeCurrentRange() {
+        const seconds = currentTimeRangeSeconds;
+        let label = "";
+        if (seconds <= 300) label = "最近 5 分钟";
+        else if (seconds <= 900) label = "最近 15 分钟";
+        else if (seconds <= 3600) label = "最近 1 小时";
+        else if (seconds <= 21600) label = "最近 6 小时";
+        else if (seconds <= 86400) label = "最近 24 小时";
+        else label = "最近 7 天";
+        const el = $("time-range-label");
+        if (el) el.textContent = `当前时间范围：${label}`;
+      }
+
+      function getSinceTs() {
+        const nowSec = Date.now() / 1000;
+        // 受“数据保存时间”限制：最多只向前看 dataRetentionDays 天
+        const maxSeconds = dataRetentionDays * 86400;
+        const effectiveSeconds = Math.min(currentTimeRangeSeconds, maxSeconds);
+        const since = Math.max(0, nowSec - effectiveSeconds);
+        return Math.floor(since);
+      }
+
+      async function fetchJSON(url, opts = {}) {
+        const res = await fetch(url, opts);
+        if (!res.ok) throw new Error(await res.text());
+        return res.json();
+      }
+
+      async function refreshStatus() {
+        try {
+          const s = await fetchJSON("/api/status");
+          const badge = $("status-badge");
+          badge.textContent = s.running ? "运行中" : "未运行";
+          badge.className = "badge " + (s.running ? "badge-success" : "badge-danger");
+
+          $("status-detail").textContent = s.running
+            ? `PID ${s.pid || "-"} · 接口 ${s.iface}`
+            : "Zeek 进程未在运行";
+          $("status-extra").textContent = `Zeek 可执行: ${s.zeek_bin} · 日志目录: ${s.logs_dir}`;
+
+          $("btn-start").disabled = s.running;
+          $("btn-stop").disabled = !s.running;
+        } catch (e) {
+          $("status-detail").textContent = "无法获取状态，请检查后端服务";
+          $("status-badge").className = "badge badge-danger";
+          $("status-badge").textContent = "错误";
+        }
+      }
+
+      async function refreshFlowsAndThreats() {
+        try {
+          const sinceTs = getSinceTs();
+          const [flows, threats] = await Promise.all([
+            fetchJSON(`/api/flows?limit=100&since_ts=${sinceTs}`),
+            fetchJSON(`/api/threats?limit=100&since_ts=${sinceTs}`),
+          ]);
+
+          // 为了“最新流量在最上方”，按时间倒序排列（ts 越新排在越前）
+          const flowsSorted = [...flows].sort(
+            (a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime(),
+          );
+          const threatsSorted = [...threats].sort(
+            (a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime(),
+          );
+
+          $("flows-count").textContent = `共 ${flowsSorted.length} 条`;
+          $("threats-count").textContent = `共 ${threatsSorted.length} 条`;
+
+          const fb = $("flows-body");
+          fb.innerHTML = "";
+          for (const f of flowsSorted) {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+              <td>${formatTs(f.ts)}</td>
+              <td>${f.orig_h}:${f.orig_p}</td>
+              <td>${f.resp_h}:${f.resp_p}</td>
+              <td>${f.proto || "-"}</td>
+              <td>${(f.orig_bytes || 0) + (f.resp_bytes || 0)}</td>
+            `;
+            fb.appendChild(tr);
+          }
+
+          const tb = $("threats-body");
+          tb.innerHTML = "";
+          for (const t of threatsSorted) {
+            const levelClass =
+              (t.level || "").toLowerCase().includes("crit") ||
+              (t.level || "").toLowerCase().includes("high")
+                ? "pill-crit"
+                : (t.level || "").toLowerCase().includes("low")
+                ? "pill-info"
+                : "pill-warning";
+            const level = t.level || "N/A";
+            const src = t.src || "-";
+            const dst = t.dst || "-";
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+              <td>${formatTs(t.ts)}</td>
+              <td>${t.note}</td>
+              <td>${src} → ${dst}</td>
+              <td><span class="pill ${levelClass}">${level}</span></td>
+            `;
+            tb.appendChild(tr);
+          }
+
+          // 图表仍然按照原始顺序聚合统计即可
+          updateChart(flows, threats);
+          await refreshLogTabs();
+          await refreshAggregates();
+        } catch (e) {
+          $("flows-count").textContent = "加载失败（/api/flows）";
+          $("threats-count").textContent = "加载失败（/api/threats）";
+          $("flows-body").innerHTML = "";
+          $("threats-body").innerHTML = "";
+        }
+      }
+
+      async function refreshLogTabs(active = window.currentLogTab || "conn") {
+        window.currentLogTab = active;
+        const buttons = document.querySelectorAll("[data-logtab]");
+        buttons.forEach((btn) => {
+          const isActive = btn.getAttribute("data-logtab") === active;
+          btn.className = "btn " + (isActive ? "btn-primary" : "");
+        });
+
+        const sinceTs = getSinceTs();
+        let url;
+        if (active === "conn") url = `/api/logs/conn?limit=100&since_ts=${sinceTs}`;
+        else if (active === "notice") url = `/api/logs/notice?limit=100&since_ts=${sinceTs}`;
+        else if (active === "intel") url = `/api/logs/intel?limit=100&since_ts=${sinceTs}`;
+        else url = `/api/logs/weird?limit=100&since_ts=${sinceTs}`;
+
+        try {
+          const items = await fetchJSON(url);
+          // 按时间倒序显示，最新日志在最上方
+          const sorted = [...items].sort(
+            (a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime(),
+          );
+          $("logtab-count").textContent = `共 ${sorted.length} 条`;
+          const tb = $("logtab-body");
+          tb.innerHTML = "";
+
+          for (const it of sorted) {
+            const tr = document.createElement("tr");
+            const src = it.src || it.orig_h || "-";
+            const dst = it.dst || it.resp_h || "-";
+            const note = it.note || active;
+            const level = it.level || it.source || "-";
+            tr.innerHTML = `
+              <td>${formatTs(it.ts)}</td>
+              <td>${note}</td>
+              <td>${src} → ${dst}</td>
+              <td>${level}</td>
+            `;
+            tb.appendChild(tr);
+          }
+        } catch (e) {
+          console.error("刷新日志明细失败:", e);
+          $("logtab-count").textContent = "加载失败（后端日志接口不可用或返回错误）";
+          $("logtab-body").innerHTML = "";
+        }
+      }
+
+      async function refreshAggregates() {
+        try {
+          const sinceTs = getSinceTs();
+          const [flowAgg, threatAgg] = await Promise.all([
+            fetchJSON(`/api/flows/aggregate?bucket_seconds=60&since_ts=${sinceTs}`),
+            fetchJSON(`/api/threats/aggregate?bucket_seconds=60&since_ts=${sinceTs}`),
+          ]);
+
+          // 仅展示最近 10 个时间桶，且按时间倒序显示（最新时间段在最上方）
+          const flowAggSlice = flowAgg.slice(-10).reverse();
+          const threatAggSlice = threatAgg.slice(-10).reverse();
+
+          const fab = $("agg-flows-body");
+          fab.innerHTML = "";
+          for (const b of flowAggSlice) {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+              <td>${formatTs(b.bucket_start)} ~ ${formatTs(b.bucket_end)}</td>
+              <td>${b.flow_count}</td>
+              <td>${b.orig_bytes_sum}</td>
+              <td>${b.resp_bytes_sum}</td>
+            `;
+            fab.appendChild(tr);
+          }
+
+          const tab = $("agg-threats-body");
+          tab.innerHTML = "";
+          for (const b of threatAggSlice) {
+            const levelStr = Object.entries(b.by_level || {})
+              .map(([k, v]) => `${k}:${v}`)
+              .join(", ");
+            const noteStr = Object.entries(b.by_note || {})
+              .map(([k, v]) => `${k}:${v}`)
+              .join(", ");
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+              <td>${formatTs(b.bucket_start)} ~ ${formatTs(b.bucket_end)}</td>
+              <td>${b.threat_count}</td>
+              <td>${levelStr || "-"}</td>
+              <td>${noteStr || "-"}</td>
+            `;
+            tab.appendChild(tr);
+          }
+        } catch (e) {
+          const fab = $("agg-flows-body");
+          const tab = $("agg-threats-body");
+          if (fab) {
+            fab.innerHTML = '<tr><td colspan="4">加载失败（/api/flows/aggregate）</td></tr>';
+          }
+          if (tab) {
+            tab.innerHTML = '<tr><td colspan="4">加载失败（/api/threats/aggregate）</td></tr>';
+          }
+        }
+      }
+
+      function switchPage(page) {
+        const overview = document.getElementById("page-overview");
+        const logs = document.getElementById("page-logs");
+        const rules = document.getElementById("page-rules");
+        const tabs = document.querySelectorAll("[data-page-tab]");
+
+        if (overview && logs && rules) {
+          overview.style.display = page === "overview" ? "" : "none";
+          logs.style.display = page === "logs" ? "" : "none";
+          rules.style.display = page === "rules" ? "" : "none";
+        }
+
+        tabs.forEach((btn) => {
+          const isActive = btn.getAttribute("data-page-tab") === page;
+          btn.className = "btn " + (isActive ? "btn-primary" : "");
+        });
+      }
+
+      // 规则配置 UI 与后端交互
+      let enabledRules = []; // [{key, label}]
+
+      function renderEnabledRules() {
+        const ul = document.getElementById("enabled-rules");
+        if (!ul) return;
+        ul.innerHTML = "";
+        enabledRules.forEach((r, idx) => {
+          const li = document.createElement("li");
+          li.style.marginBottom = "0.25rem";
+          li.innerHTML = `
+            <span class="pill">${r.label}</span>
+            <button data-idx="${idx}" class="btn btn-danger" style="margin-left:0.5rem;padding:0.1rem 0.5rem;font-size:0.7rem;">删除</button>
+          `;
+          ul.appendChild(li);
+        });
+
+        ul.querySelectorAll("button[data-idx]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const i = parseInt(btn.getAttribute("data-idx"), 10);
+            if (!Number.isNaN(i)) {
+              enabledRules.splice(i, 1);
+              renderEnabledRules();
+            }
+          });
+        });
+      }
+
+      async function refreshRulesSummary() {
+        const textEl = document.getElementById("rules-summary-text");
+        const listEl = document.getElementById("rules-summary-list");
+        if (!textEl || !listEl) return;
+        try {
+          const cfg = await fetchJSON("/api/rules");
+          const enabled = cfg.enabled_rules || [];
+          const hasCustom = !!(cfg.custom_rule && cfg.custom_rule.trim());
+           const retentionDays = cfg.data_retention_days || 7;
+           const displayDays = cfg.data_display_days || 7;
+
+          let baseText;
+          if (!enabled.length && !hasCustom) {
+            baseText = "当前未启用任何规则，使用默认 Zeek 行为。";
+          } else {
+            baseText = hasCustom
+              ? "已配置规则（带自定义脚本），重启 Zeek 后生效。"
+              : "已配置规则，重启 Zeek 后生效。";
+          }
+          textEl.textContent =
+            baseText +
+            ` 数据保存时间：${retentionDays} 天；数据显示时间：${displayDays} 天。`;
+
+          const labelMap = {
+            "policy/protocols/conn/scan": "端口扫描检测（官方）",
+            "policy/frameworks/notice/weird-manager": "Weird 转 Notice（官方）",
+            "custom/portscan": "自定义端口扫描规则（示例）",
+          };
+
+          listEl.innerHTML = "";
+          enabled.forEach((key) => {
+            const li = document.createElement("li");
+            li.style.marginBottom = "0.25rem";
+            const label = labelMap[key] || key;
+            li.innerHTML = `<span class="pill">${label}</span> <span class="muted" style="margin-left:0.35rem;font-size:0.7rem;">(${key})</span>`;
+            listEl.appendChild(li);
+          });
+
+          if (hasCustom) {
+            const li = document.createElement("li");
+            li.style.marginTop = "0.25rem";
+            li.innerHTML =
+              '<span class="pill pill-info">自定义脚本已配置</span> <span class="muted" style="margin-left:0.35rem;font-size:0.7rem;">（local.zeek 中追加自定义片段）</span>';
+            listEl.appendChild(li);
+          }
+        } catch (e) {
+          textEl.textContent = "无法加载规则配置（/api/rules 不可用）。";
+          listEl.innerHTML = "";
+          console.warn("刷新规则概况失败:", e);
+        }
+      }
+
+      async function loadRulesFromServer(customText, retentionInput, displayInput) {
+        try {
+          const cfg = await fetchJSON("/api/rules");
+          const labelMap = {
+            "policy/protocols/conn/scan": "端口扫描检测（官方）",
+            "policy/frameworks/notice/weird-manager": "Weird 转 Notice（官方）",
+            "custom/portscan": "自定义端口扫描规则（示例）",
+          };
+          enabledRules = (cfg.enabled_rules || []).map((key) => ({
+            key,
+            label: labelMap[key] || key,
+          }));
+          renderEnabledRules();
+          if (cfg.custom_rule && customText) {
+            customText.value = cfg.custom_rule;
+          }
+
+          // 数据保存时间 / 显示时间（天），兼容后端默认值
+          dataRetentionDays = parseInt(cfg.data_retention_days || 7, 10) || 7;
+          dataDisplayDays = parseInt(cfg.data_display_days || 7, 10) || 7;
+
+          if (retentionInput) {
+            retentionInput.value = dataRetentionDays;
+          }
+          if (displayInput) {
+            displayInput.value = dataDisplayDays;
+          }
+
+          // 根据数据显示时间，调整默认时间范围选择（选择不超过该天数的最大预设范围）
+          if (timeRangeSelectEl) {
+            const desiredSeconds = dataDisplayDays * 86400;
+            let bestOption = null;
+            let bestValue = 0;
+            Array.from(timeRangeSelectEl.options).forEach((opt) => {
+              const v = parseInt(opt.value, 10);
+              if (!Number.isNaN(v) && v <= desiredSeconds && v >= bestValue) {
+                bestValue = v;
+                bestOption = opt;
+              }
+            });
+            if (!bestOption) {
+              // 如果所有预设都大于期望值，就选最小的一个
+              bestOption = timeRangeSelectEl.options[0];
+              bestValue = parseInt(bestOption.value, 10) || 300;
+            }
+            currentTimeRangeSeconds = bestValue;
+            timeRangeSelectEl.value = String(bestValue);
+            describeCurrentRange();
+            // 使用最新配置刷新一次数据视图
+            await refreshFlowsAndThreats();
+            await refreshLogTabs("conn");
+            await refreshAggregates();
+          }
+        } catch (e) {
+          // 后端未实现 /api/rules 时静默忽略
+          console.warn("加载规则配置失败（可忽略）:", e);
+        }
+      }
+
+      async function validateRulesOnServer(ruleKeys) {
+        try {
+          const res = await fetchJSON("/api/rules/validate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ rules: ruleKeys }),
+          });
+          return res;
+        } catch (e) {
+          console.warn("验证规则失败（/api/rules/validate 不可用）:", e);
+          // 后端不支持校验接口时，前端不阻塞，但给出一次提醒
+          return { ok: true, invalid: [] };
+        }
+      }
+
+      function initRuleUI() {
+        const addBtn = document.getElementById("btn-add-rule");
+        const select = document.getElementById("rule-select");
+        const customText = document.getElementById("custom-rule-text");
+        const saveBtn = document.getElementById("btn-save-rules");
+        const retentionInput = document.getElementById("data-retention-days");
+        const displayInput = document.getElementById("data-display-days");
+
+        if (!addBtn || !select || !customText || !saveBtn) return;
+
+        loadRulesFromServer(customText, retentionInput, displayInput);
+
+        addBtn.addEventListener("click", async () => {
+          const key = select.value;
+          const label = select.options[select.selectedIndex].textContent;
+          if (enabledRules.find((r) => r.key === key)) {
+            return;
+          }
+
+          // 只对 Zeek 内置脚本路径做一次后端校验
+          const res = await validateRulesOnServer([key]);
+          if (!res.ok && res.invalid && res.invalid.includes(key)) {
+            alert(
+              `无法添加规则：${key} 在当前 Zeek 环境中不存在或不可加载，请检查 Zeek 版本/脚本路径。`,
+            );
+            return;
+          }
+
+          enabledRules.push({ key, label });
+          renderEnabledRules();
+        });
+
+        saveBtn.addEventListener("click", async () => {
+          const retentionDaysVal =
+            (retentionInput && parseInt(retentionInput.value, 10)) || dataRetentionDays || 7;
+          const displayDaysVal =
+            (displayInput && parseInt(displayInput.value, 10)) || dataDisplayDays || 7;
+
+          const ruleKeys = enabledRules.map((r) => r.key);
+
+          // 保存前对所有规则做一次批量校验，避免写入无效配置
+          const res = await validateRulesOnServer(ruleKeys);
+          if (!res.ok && res.invalid && res.invalid.length > 0) {
+            alert(
+              `保存失败：以下规则在当前 Zeek 环境中不可加载，请取消勾选或修正后重试：\n\n${res.invalid.join(
+                "\n",
+              )}`,
+            );
+            return;
+          }
+
+          const payload = {
+            enabled_rules: ruleKeys,
+            custom_rule: customText.value || "",
+            data_retention_days: retentionDaysVal,
+            data_display_days: displayDaysVal,
+          };
+          try {
+            await fetchJSON("/api/rules", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+            alert("规则配置已保存，重启 Zeek 后生效。");
+            // 保存成功后刷新概况视图
+            refreshRulesSummary();
+          } catch (e) {
+            alert("保存规则配置失败: " + e.message);
+          }
+        });
+      }
+
+      function updateChart(flows, threats) {
+        const bucket = (arr, type) => {
+          const map = {};
+          for (const x of arr) {
+            const d = new Date(x.ts);
+            const key =
+              d.getHours().toString().padStart(2, "0") +
+              ":" +
+              d.getMinutes().toString().padStart(2, "0");
+            map[key] = (map[key] || 0) + 1;
+          }
+          return map;
+        };
+
+        const flowMap = bucket(flows, "flow");
+        const threatMap = bucket(threats, "threat");
+        const labels = Array.from(new Set([...Object.keys(flowMap), ...Object.keys(threatMap)])).sort();
+        const flowData = labels.map((k) => flowMap[k] || 0);
+        const threatData = labels.map((k) => threatMap[k] || 0);
+
+        const ctx = document.getElementById("trafficChart").getContext("2d");
+        if (!chart) {
+          chart = new Chart(ctx, {
+            type: "line",
+            data: {
+              labels,
+              datasets: [
+                {
+                  label: "普通流量",
+                  data: flowData,
+                  borderColor: "#60a5fa",
+                  backgroundColor: "rgba(37, 99, 235, 0.2)",
+                  tension: 0.3,
+                },
+                {
+                  label: "威胁事件",
+                  data: threatData,
+                  borderColor: "#f97316",
+                  backgroundColor: "rgba(249, 115, 22, 0.2)",
+                  tension: 0.3,
+                },
+              ],
+            },
+            options: {
+              plugins: {
+                legend: { labels: { color: "#e5e7eb" } },
+              },
+              scales: {
+                x: { ticks: { color: "#9ca3af" }, grid: { color: "#111827" } },
+                y: { ticks: { color: "#9ca3af" }, grid: { color: "#111827" } },
+              },
+            },
+          });
+        } else {
+          chart.data.labels = labels;
+          chart.data.datasets[0].data = flowData;
+          chart.data.datasets[1].data = threatData;
+          chart.update();
+        }
+      }
+
+      $("btn-start").addEventListener("click", async () => {
+        $("btn-start").disabled = true;
+        try {
+          await fetchJSON("/api/control/start", { method: "POST" });
+        } catch (e) {
+          alert("启动失败: " + e.message);
+        } finally {
+          await refreshStatus();
+        }
+      });
+
+      $("btn-stop").addEventListener("click", async () => {
+        $("btn-stop").disabled = true;
+        try {
+          await fetchJSON("/api/control/stop", { method: "POST" });
+        } catch (e) {
+          alert("停止失败: " + e.message);
+        } finally {
+          await refreshStatus();
+        }
+      });
+
+      (async function init() {
+        const timeRangeSelect = $("time-range-select");
+        if (timeRangeSelect) {
+          timeRangeSelectEl = timeRangeSelect;
+          timeRangeSelect.addEventListener("change", async () => {
+            const val = parseInt(timeRangeSelect.value, 10);
+            if (!Number.isNaN(val) && val > 0) {
+              currentTimeRangeSeconds = val;
+              describeCurrentRange();
+              await refreshFlowsAndThreats();
+            }
+          });
+        }
+        describeCurrentRange();
+
+        await refreshStatus();
+        await refreshRulesSummary();
+        await refreshFlowsAndThreats();
+        await refreshLogTabs("conn");
+        await refreshAggregates();
+
+        document.querySelectorAll("[data-logtab]").forEach((btn) => {
+          btn.addEventListener("click", () =>
+            refreshLogTabs(btn.getAttribute("data-logtab")),
+          );
+        });
+
+        document.querySelectorAll("[data-page-tab]").forEach((btn) => {
+          btn.addEventListener("click", () =>
+            switchPage(btn.getAttribute("data-page-tab")),
+          );
+        });
+        switchPage("overview");
+
+        initRuleUI();
+
+        setInterval(refreshStatus, 5000);
+        setInterval(refreshFlowsAndThreats, 4000);
+      })();
+    </script>
+  </body>
+  </html>
+
+

@@ -1,0 +1,31 @@
+# Python 编译文件
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+
+# 虚拟环境
+venv/
+.venv/
+env/
+
+# 日志和运行时输出
+logs/
+*.log
+
+# Zeek 生成文件
+zeek_scripts/local.zeek
+
+# 编辑器/系统文件
+.vscode/
+.idea/
+*.swp
+*.swo
+*.DS_Store
+Thumbs.db
+
+# Windows 标记文件（Zone.Identifier 等）
+*?:Zone.Identifier
+
+
